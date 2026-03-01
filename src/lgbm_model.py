@@ -26,9 +26,16 @@ class LightGBMGoalModel:
     def __init__(self):
         self.model = lgb.LGBMRegressor(
             objective="poisson",
-            n_estimators=500,
-            learning_rate=0.03,
-            max_depth=6,
+            metric="poisson",
+            n_estimators=2000,
+            learning_rate=0.01,
+            max_depth=-1,
+            num_leaves=64,
+            min_child_samples=20,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_alpha=1.0,
+            reg_lambda=1.0,
             verbosity=-1
         )
 

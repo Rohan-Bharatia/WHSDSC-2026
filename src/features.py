@@ -42,6 +42,7 @@ def build_line_matchup_features():
         "home_xg": "sum",
         "away_xg": "sum",
         "home_goals": "sum",
+        "away_goals": "sum",
         "toi": "sum"
     }).reset_index()
 

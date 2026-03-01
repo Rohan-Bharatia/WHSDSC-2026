@@ -57,20 +57,39 @@ def prepare_training_data():
         sys.exit(1)
 
     df = df[df["toi"] > 0]
-    x = df[["home_xg", "away_xg", "toi", "xg_per_60"]].copy()
-    y = df["xg_per_60"]
+
+    elo = build_elo_from_games(df)
+    df["elo_home"] = df["home_team"].map(elo.ratings)
+    df["elo_away"] = df["away_team"].map(elo.ratings)
+    df["elo_diff"] = df["elo_home"] - df["elo_away"]
+
+    x = df[[
+        "home_xg",
+        "away_xg",
+        "toi",
+        "xg_per_60",
+        "goals_per_60",
+        "elo_home",
+        "elo_away",
+        "elo_diff"
+    ]].copy()
+    y_home = df["home_goals"]
+    y_away = df["away_goals"]
 
     print(f"\033[32;1m[INFO]\033[0m Training rows: {len(x)}")
-    return df, x, y
+    return df, x, y_home, y_away, elo
 
-def train_goal_model(x, y):
+def train_goal_model(x, y_home, y_away):
     print("\033[32;1m[INFO]\033[0m Training LightGBM goal model...")
 
-    model = LightGBMGoalModel()
-    model.fit(x, y)
+    model_home = LightGBMGoalModel()
+    model_home.fit(x, y_home)
+
+    model_away = LightGBMGoalModel()
+    model_away.fit(x, y_away)
 
     print("\033[32;1m[INFO]\033[0m Model training complete.")
-    return model
+    return model_home, model_away
 
 def build_elo_from_games(df):
     print("\033[32;1m[INFO]\033[0m Building ELO ratings from previous games...")
@@ -96,10 +115,10 @@ def build_elo_from_games(df):
     print("\033[32;1m[INFO]\033[0m ELO ratings initialized")
     return elo
 
-def simulate_season(df, model, elo):
+def simulate_season(df, model_home, model_away, elo):
     print("\033[32;1m[INFO]\033[0m Simulating season...")
 
-    simulator = SeasonSimulator(model, elo)
+    simulator = SeasonSimulator(model_home, model_away, elo)
     results = []
     games = (
         df.groupby(["home_team", "away_team"])
@@ -116,7 +135,11 @@ def simulate_season(df, model, elo):
             "home_xg": row["home_xg"],
             "away_xg": row["away_xg"],
             "toi": row["toi"],
-            "xg_per_60": row["home_xg"] / row["toi"] * 3600 if row["toi"] > 0 else 0
+            "xg_per_60": row["home_xg"] / row["toi"] * 3600 if row["toi"] > 0 else 0,
+            "goals_per_60": 0,
+            "elo_home": elo.ratings[row["home_team"]],
+            "elo_away": elo.ratings[row["away_team"]],
+            "elo_diff": elo.ratings[row["home_team"]] - elo.ratings[row["away_team"]],
         }])
 
         goals_a, goals_b, went_ot = simulator.simulate_game(
@@ -141,10 +164,9 @@ def main():
     try:
         load_raw_data()
 
-        df, x, y = prepare_training_data()
-        model = train_goal_model(x, y)
-        elo = elo = build_elo_from_games(df)
-        results = simulate_season(df, model, elo)
+        df, x, y_home, y_away, elo = prepare_training_data()
+        model_home, model_away = train_goal_model(x, y_home, y_away)
+        results = simulate_season(df, model_home, model_away, elo)
         standings = compute_standings(results)
 
         print("\033[32;1m[INFO]\033[0m Final Standings:")
@@ -158,6 +180,7 @@ def main():
 
     except Exception as e:
         print(f"\033[31;1m[ERROR]\033[0m A fatal error occurred: {e}")
+        raise
 
 if __name__ == "__main__":
     main()

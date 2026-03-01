@@ -23,8 +23,9 @@
 import numpy as np
 
 class SeasonSimulator:
-    def __init__(self, poisson_model, elo_system):
-        self.poisson = poisson_model
+    def __init__(self, model_home, model_away, elo_system):
+        self.model_home = model_home
+        self.model_away = model_away
         self.elo = elo_system
         self.ot_time_ratio = 5 / 60
 
@@ -38,8 +39,8 @@ class SeasonSimulator:
         return goals_a, goals_b
 
     def simulate_game(self, team_a, team_b, features_a, features_b):
-        lambda_a = self.poisson.predict(features_a)[0]
-        lambda_b = self.poisson.predict(features_b)[0]
+        lambda_a = self.model_home.predict(features_a)[0]
+        lambda_b = self.model_away.predict(features_b)[0]
 
         goals_a = np.random.poisson(lambda_a)
         goals_b = np.random.poisson(lambda_b)
