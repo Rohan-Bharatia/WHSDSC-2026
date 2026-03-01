@@ -22,6 +22,7 @@
 
 import sys
 import time
+import argparse
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 import pandas as pd
@@ -250,6 +251,13 @@ def sort_data(results):
     return summary
 
 def main():
+    parser = argparse.ArgumentParser(
+        prog="WHL Analytics Engine",
+        description="Simulate and analyze hockey season outcomes"
+    )
+    parser.add_argument("--seasons")
+    args = parser.parse_args()
+
     try:
         np.random.seed(42)
 
@@ -257,7 +265,7 @@ def main():
 
         df, x, y_home, y_away, elo = prepare_training_data()
         model_home, model_away = train_goal_model(x, y_home, y_away)
-        results = simulate_seasons(df, model_home, model_away, elo)
+        results = simulate_seasons(df, model_home, model_away, elo, int(args.seasons) if args.seasons is not None else 1000)
 
         print("\033[32;1m[INFO]\033[0m Final Standings:")
         summary = sort_data(results)
