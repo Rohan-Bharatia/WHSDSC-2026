@@ -23,7 +23,6 @@
 import sys
 from pathlib import Path
 import pandas as pd
-import numpy as np
 from src import *
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -120,7 +119,7 @@ def simulate_season(df, model, elo):
             "xg_per_60": row["home_xg"] / row["toi"] * 3600 if row["toi"] > 0 else 0
         }])
 
-        goals_a, goals_b = simulator.simulate_game(
+        goals_a, goals_b, went_ot = simulator.simulate_game(
             row["home_team"],
             row["away_team"],
             features,
@@ -132,7 +131,7 @@ def simulate_season(df, model, elo):
             row["away_team"],
             goals_a,
             goals_b,
-            False # TODO: Add overtime tracking
+            went_ot
         ))
 
     print("\033[32;1m[INFO]\033[0m Season simulation complete")

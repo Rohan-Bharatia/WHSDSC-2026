@@ -26,6 +26,16 @@ class SeasonSimulator:
     def __init__(self, poisson_model, elo_system):
         self.poisson = poisson_model
         self.elo = elo_system
+        self.ot_time_ratio = 5 / 60
+
+    def simulate_overtime(self, lambda_a, lambda_b):
+        ot_lambda_a = lambda_a * self.ot_time_ratio
+        ot_lambda_b = lambda_b * self.ot_time_ratio
+
+        goals_a = np.random.poisson(ot_lambda_a)
+        goals_b = np.random.poisson(ot_lambda_b)
+
+        return goals_a, goals_b
 
     def simulate_game(self, team_a, team_b, features_a, features_b):
         lambda_a = self.poisson.predict(features_a)[0]
@@ -34,12 +44,22 @@ class SeasonSimulator:
         goals_a = np.random.poisson(lambda_a)
         goals_b = np.random.poisson(lambda_b)
 
+        went_ot = False
+
         if goals_a == goals_b:
-            if np.random.rand() > 0.5:
-                goals_a += 1
-            else:
-                goals_b += 1
+            went_ot = True
+
+            ot_a, ot_b = self.simulate_overtime(lambda_a, lambda_b)
+
+            goals_a += ot_a
+            goals_b += ot_b
+
+            if goals_a == goals_b:
+                if np.random.rand() < 0.5:
+                    goals_a += 1
+                else:
+                    goals_b += 1
 
         self.elo.update(team_a, team_b, goals_a, goals_b)
 
-        return goals_a, goals_b
+        return goals_a, goals_b, went_ot
