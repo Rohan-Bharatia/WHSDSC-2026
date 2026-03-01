@@ -23,6 +23,7 @@
 import sys
 from pathlib import Path
 import pandas as pd
+import numpy as np
 from src import *
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -46,7 +47,7 @@ def load_raw_data():
     print(f"\033[32;1m[INFO]\033[0m Loading shift data from {WHL_FILE}")
     load_csv_to_db(WHL_FILE)
 
-    print("\033[32;1m[INFO]\033[0m Raw data loaded successfully.")
+    print("\033[32;1m[INFO]\033[0m Raw data loaded successfully")
 
 def prepare_training_data():
     print("\033[32;1m[INFO]\033[0m Building line matchup features...")
@@ -88,7 +89,7 @@ def train_goal_model(x, y_home, y_away):
     model_away = LightGBMGoalModel()
     model_away.fit(x, y_away)
 
-    print("\033[32;1m[INFO]\033[0m Model training complete.")
+    print("\033[32;1m[INFO]\033[0m Model training complete")
     return model_home, model_away
 
 def build_elo_from_games(df):
@@ -116,8 +117,6 @@ def build_elo_from_games(df):
     return elo
 
 def simulate_season(df, model_home, model_away, elo):
-    print("\033[32;1m[INFO]\033[0m Simulating season...")
-
     simulator = SeasonSimulator(model_home, model_away, elo)
     results = []
     games = (
@@ -131,7 +130,7 @@ def simulate_season(df, model_home, model_away, elo):
     )
 
     for _, row in games.iterrows():
-        features = pd.DataFrame([{
+        features_home = pd.DataFrame([{
             "home_xg": row["home_xg"],
             "away_xg": row["away_xg"],
             "toi": row["toi"],
@@ -142,11 +141,22 @@ def simulate_season(df, model_home, model_away, elo):
             "elo_diff": elo.ratings[row["home_team"]] - elo.ratings[row["away_team"]],
         }])
 
+        features_away = pd.DataFrame([{
+            "home_xg": row["away_xg"],  # swapped
+            "away_xg": row["home_xg"],  # swapped
+            "toi": row["toi"],
+            "xg_per_60": row["away_xg"] / row["toi"] * 3600 if row["toi"] > 0 else 0,
+            "goals_per_60": 0,
+            "elo_home": elo.ratings[row["away_team"]],
+            "elo_away": elo.ratings[row["home_team"]],
+            "elo_diff": elo.ratings[row["away_team"]] - elo.ratings[row["home_team"]],
+        }])
+
         goals_a, goals_b, went_ot = simulator.simulate_game(
             row["home_team"],
             row["away_team"],
-            features,
-            features
+            features_home,
+            features_away
         )
 
         results.append((
@@ -157,25 +167,88 @@ def simulate_season(df, model_home, model_away, elo):
             went_ot
         ))
 
-    print("\033[32;1m[INFO]\033[0m Season simulation complete")
     return results
+
+def simulate_seasons(df, model_home, model_away, elo, n=1000):
+    print(f"\033[32;1m[INFO]\033[0m Simulating {n} season{"s" if n > 1 else ""} (this might take a while)...")
+
+    all_standings = {}
+
+    for i in range(n):
+        sim_elo = EloSystem()
+        sim_elo.ratings.update(elo.ratings.copy())
+
+        results = simulate_season(df, model_home, model_away, sim_elo)
+        standings = compute_standings(results)
+
+        for rank, (team, stats) in enumerate(standings, start=1):
+            if team not in all_standings:
+                all_standings[team] = []
+
+            all_standings[team].append((rank, stats))
+
+        print(f"  \033[32;1m[INFO]\033[0m Season {i + 1} complete")
+
+    print("\033[32;1m[INFO]\033[0m Season simulation complete")
+    return all_standings
+
+def sort_data(results):
+    summary = []
+
+    for team, results_list in results.items():
+        ranks = []
+        points = []
+        gf = []
+        ga = []
+        championships = 0
+
+        for rank, stats in results_list:
+            ranks.append(rank)
+            points.append(stats["points"])
+            gf.append(stats["gf"])
+            ga.append(stats["ga"])
+
+            if rank == 1:
+                championships += 1
+
+        avg_rank = sum(ranks) / len(ranks)
+        avg_points = sum(points) / len(points)
+        avg_gf = sum(gf) / len(gf)
+        avg_ga = sum(ga) / len(ga)
+        win_prob = championships / len(ranks)
+
+        summary.append({
+            "team": team,
+            "avg_rank": avg_rank,
+            "avg_points": avg_points,
+            "avg_gf": avg_gf,
+            "avg_ga": avg_ga,
+            "championship_prob": win_prob
+        })
+
+    summary = sorted(summary, key=lambda x: x["avg_rank"])
+    return summary
 
 def main():
     try:
+        np.random.seed(42)
+
         load_raw_data()
 
         df, x, y_home, y_away, elo = prepare_training_data()
         model_home, model_away = train_goal_model(x, y_home, y_away)
-        results = simulate_season(df, model_home, model_away, elo)
-        standings = compute_standings(results)
+        results = simulate_seasons(df, model_home, model_away, elo)
 
         print("\033[32;1m[INFO]\033[0m Final Standings:")
-        for rank, (team, stats) in enumerate(standings, start=1):
+        summary = sort_data(results)
+        for i, team_data in enumerate(summary, start=1):
             print(
-                f" {rank:2d}. {team:<18} "
-                f" {stats['points']:3d} pts  "
-                f" GF: {stats['gf']:3d}  "
-                f" GA: {stats['ga']:3d}"
+                f"{i:2d}. {team_data['team']:<18} "
+                f"Avg Rank: {team_data['avg_rank']:.2f}  "
+                f"Avg Pts: {team_data['avg_points']:.1f}  "
+                f"GF: {team_data['avg_gf']:.1f}  "
+                f"GA: {team_data['avg_ga']:.1f}  "
+                f"Title%: {team_data['championship_prob']*100:.1f}%"
             )
 
     except Exception as e:

@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 import lightgbm as lgb
+import sklearn.model_selection as model
 
 class LightGBMGoalModel:
     def __init__(self):
@@ -40,7 +41,12 @@ class LightGBMGoalModel:
         )
 
     def fit(self, x, y):
-        self.model.fit(x, y)
+        x_train, x_val, y_train, y_val = model.train_test_split(x, y, test_size=0.2, random_state=42)
+        self.model.fit(
+            x_train,
+            y_train,
+            eval_set=[(x_val, y_val)],
+        )
 
     def predict(self, x):
         return self.model.predict(x)
