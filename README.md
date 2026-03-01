@@ -12,3 +12,6 @@ This repository is licensed under the [MIT License](LICENSE).
 2. Install the required packages with `pip install -r requirements.txt` (Recommended to install packages in a python virtual environment)
 3. Run `python main.py`
 
+### Jupyter Notebook
+
+To run the Jupyter notebook, run `jupyter notebook` in the root directory after installing the required packages.
