@@ -33,6 +33,7 @@ __all__ = [
     "create_tables",
     "load_csv_to_db",
     "build_line_matchup_features",
+    "default_elo",
     "EloSystem",
     "LightGBMGoalModel",
     "compute_line_strength",

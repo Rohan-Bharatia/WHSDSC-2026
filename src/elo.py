@@ -25,9 +25,12 @@ from collections import defaultdict
 K = 20
 BASE_ELO = 1500
 
+def default_elo():
+    return BASE_ELO
+
 class EloSystem:
     def __init__(self):
-        self.ratings = defaultdict(lambda: BASE_ELO)
+        self.ratings = defaultdict(default_elo)
 
     def expected(self, team_a, team_b):
         ra = self.ratings[team_a]

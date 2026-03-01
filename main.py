@@ -21,6 +21,8 @@
 # SOFTWARE.
 
 import sys
+import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -81,7 +83,7 @@ def prepare_training_data():
     return df, x, y_home, y_away, elo
 
 def train_goal_model(x, y_home, y_away):
-    print("\033[32;1m[INFO]\033[0m Training LightGBM goal model...")
+    print("\033[32;1m[INFO]\033[0m Training LightGBM goal model (this might take a while)...")
 
     model_home = LightGBMGoalModel()
     model_home.fit(x, y_home)
@@ -169,25 +171,43 @@ def simulate_season(df, model_home, model_away, elo):
 
     return results
 
-def simulate_seasons(df, model_home, model_away, elo, n=1000):
+def run_season(i, df, model_home, model_away, elo_ratings):
+    start_time = time.time()
+
+    np.random.seed(42 + i)
+
+    sim_elo = EloSystem()
+    sim_elo.ratings.update(elo_ratings.copy())
+
+    results = simulate_season(df, model_home, model_away, sim_elo)
+    standings = compute_standings(results)
+
+    duration = time.time() - start_time
+    return i, standings, duration
+
+def simulate_seasons(df, model_home, model_away, elo, n=1000, max_workers=None):
     print(f"\033[32;1m[INFO]\033[0m Simulating {n} season{"s" if n > 1 else ""} (this might take a while)...")
 
     all_standings = {}
 
-    for i in range(n):
-        sim_elo = EloSystem()
-        sim_elo.ratings.update(elo.ratings.copy())
+    elo_ratings = elo.ratings.copy()
 
-        results = simulate_season(df, model_home, model_away, sim_elo)
-        standings = compute_standings(results)
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(run_season, i, df, model_home, model_away, elo_ratings)
+            for i in range(n)
+        ]
 
-        for rank, (team, stats) in enumerate(standings, start=1):
-            if team not in all_standings:
-                all_standings[team] = []
+        for future in as_completed(futures):
+            i, standings, duration = future.result()
 
-            all_standings[team].append((rank, stats))
+            for rank, (team, stats) in enumerate(standings, start=1):
+                if team not in all_standings:
+                    all_standings[team] = []
 
-        print(f"  \033[32;1m[INFO]\033[0m Season {i + 1} complete")
+                all_standings[team].append((rank, stats))
+
+            print(f"  \033[32;1m[INFO]\033[0m Season {i + 1} complete ({duration:.2f}s)")
 
     print("\033[32;1m[INFO]\033[0m Season simulation complete")
     return all_standings
@@ -243,7 +263,7 @@ def main():
         summary = sort_data(results)
         for i, team_data in enumerate(summary, start=1):
             print(
-                f"{i:2d}. {team_data['team']:<18} "
+                f"  {i:2d}. {team_data['team']:<18} "
                 f"Avg Rank: {team_data['avg_rank']:.2f}  "
                 f"Avg Pts: {team_data['avg_points']:.1f}  "
                 f"GF: {team_data['avg_gf']:.1f}  "
