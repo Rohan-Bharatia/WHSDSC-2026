@@ -21,7 +21,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from .logger import *
 from .database import *
 from .features import *
 from .elo import *
@@ -31,9 +30,6 @@ from .simulator import *
 from .ranking import *
 
 __all__ = [
-    "info",
-    "warn",
-    "error",
     "connect",
     "create_tables",
     "load_csv_to_db",

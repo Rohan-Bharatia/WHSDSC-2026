@@ -33,9 +33,6 @@ def create_tables():
     conn = connect()
     cur = conn.cursor()
 
-    if DB_FILE.exists():
-        DB_FILE.unlink()
-
     cur.execute("""
     CREATE TABLE IF NOT EXISTS shifts (
         game_id TEXT,

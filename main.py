@@ -20,55 +20,61 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import argparse
+import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
 from src import *
 
 BASE_DIR = Path(__file__).resolve().parent
+DB_FILE = BASE_DIR / "data" / "whl.db"
 RAW_DIR = BASE_DIR / "data" / "raw"
 WHL_FILE = RAW_DIR / "whl25.csv"
 MATCHUPS_FILE = RAW_DIR / "matchups.csv"
 DICTIONARY_FILE = RAW_DIR / "dictionary.csv"
 
 def load_raw_data():
-    info("Creating database tables...")
+    print("\033[32;1m[INFO]\033[0m Creating database tables...")
+    if DB_FILE.exists():
+        print("\033[33;1m[WARNING]\033[0m Database already exists, deleting...")
+        DB_FILE.unlink()
     create_tables()
 
     if not WHL_FILE.exists():
-        error(f"Missing file: {WHL_FILE}")
+        print(f"\033[31;1m[ERROR]\033[0m Missing file: {WHL_FILE}")
+        sys.exit(1)
 
-    info(f"Loading shift data from {WHL_FILE}")
+    print(f"\033[32;1m[INFO]\033[0m Loading shift data from {WHL_FILE}")
     load_csv_to_db(WHL_FILE)
 
-    info("Raw data loaded successfully.")
+    print("\033[32;1m[INFO]\033[0m Raw data loaded successfully.")
 
 def prepare_training_data():
-    info("Building line matchup features...")
+    print("\033[32;1m[INFO]\033[0m Building line matchup features...")
     df = build_line_matchup_features()
 
     if df.empty:
-        error("No data returned from the feature builder")
+        print("\033[31;1m[ERROR]\033[0m No data returned from the feature builder")
+        sys.exit(1)
 
     df = df[df["toi"] > 0]
     x = df[["home_xg", "away_xg", "toi", "xg_per_60"]].copy()
     y = df["xg_per_60"]
 
-    info(f"Training rows: {len(x)}")
+    print(f"\033[32;1m[INFO]\033[0m Training rows: {len(x)}")
     return df, x, y
 
 def train_goal_model(x, y):
-    info("Training LightGBM goal model...")
+    print("\033[32;1m[INFO]\033[0m Training LightGBM goal model...")
 
     model = LightGBMGoalModel()
     model.fit(x, y)
 
-    info("Model training complete.")
+    print("\033[32;1m[INFO]\033[0m Model training complete.")
     return model
 
 def build_elo_from_games(df):
-    info("Building ELO ratings from previous games...")
+    print("\033[32;1m[INFO]\033[0m Building ELO ratings from previous games...")
 
     elo = EloSystem()
     games = (
@@ -88,11 +94,11 @@ def build_elo_from_games(df):
             row["away_xg"]
         )
 
-    info("ELO ratings initialized")
+    print("\033[32;1m[INFO]\033[0m ELO ratings initialized")
     return elo
 
 def simulate_season(df, model, elo):
-    info("Simulating season...")
+    print("\033[32;1m[INFO]\033[0m Simulating season...")
 
     simulator = SeasonSimulator(model, elo)
     results = []
@@ -129,7 +135,7 @@ def simulate_season(df, model, elo):
             False # TODO: Add overtime tracking
         ))
 
-    info("Season simulation complete")
+    print("\033[32;1m[INFO]\033[0m Season simulation complete")
     return results
 
 def main():
@@ -142,19 +148,17 @@ def main():
         results = simulate_season(df, model, elo)
         standings = compute_standings(results)
 
-        info("Final Standings")
-        print("-" * 70)
+        print("\033[32;1m[INFO]\033[0m Final Standings:")
         for rank, (team, stats) in enumerate(standings, start=1):
             print(
-                f"{rank:2d}. {team:<22} "
-                f"{stats['points']:3d} pts  "
-                f"GF: {stats['gf']:3d}  "
-                f"GA: {stats['ga']:3d}"
+                f" {rank:2d}. {team:<18} "
+                f" {stats['points']:3d} pts  "
+                f" GF: {stats['gf']:3d}  "
+                f" GA: {stats['ga']:3d}"
             )
-        print("-" * 70)
 
-    except Exception:
-        raise
+    except Exception as e:
+        print(f"\033[31;1m[ERROR]\033[0m A fatal error occurred: {e}")
 
 if __name__ == "__main__":
     main()

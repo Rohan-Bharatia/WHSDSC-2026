@@ -28,7 +28,8 @@ class LightGBMGoalModel:
             objective="poisson",
             n_estimators=500,
             learning_rate=0.03,
-            max_depth=6
+            max_depth=6,
+            verbosity=-1
         )
 
     def fit(self, x, y):
