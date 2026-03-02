@@ -24,7 +24,9 @@ import sqlite3
 import pandas as pd
 from pathlib import Path
 
-DB_FILE = Path("./data/whl.db")
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
+DB_FILE = DATA_DIR / "whl.db"
 
 def connect() -> sqlite3.Connection:
     return sqlite3.connect(DB_FILE)
