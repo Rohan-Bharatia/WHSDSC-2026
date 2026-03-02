@@ -26,8 +26,7 @@ The result is a probabilistic forecast of:
 
 ## ⚙️ Installation
 
-1. Install Python 3.10+ from:
-[https://www.python.org/](https://www.python.org/)
+1. Install [Python](https://www.python.org/) (v3.10+)
 
 Confirm the installation with:
 
@@ -84,7 +83,7 @@ Example output:
 ...
 ```
 
-A full example output after 5000 simulated seasons is linked at [output.txt](./output.txt)
+A full example output after 5000 simulated seasons is linked at [`output.txt`](./output.txt)
 
 ## 📓 Jupyter Notebook Version
 
